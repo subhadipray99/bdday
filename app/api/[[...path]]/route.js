@@ -37,19 +37,18 @@ function esc(s) {
 }
 
 function emailShell(inner) {
-  return `<div style="margin:0;background:#06060f;padding:32px 16px;font-family:Inter,Arial,Helvetica,sans-serif">
-    <div style="max-width:520px;margin:0 auto;border-radius:26px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);background:#0d0b1f">
-      <div style="background:linear-gradient(135deg,#FF4D8D 0%,#A855F7 50%,#22D3EE 100%);padding:38px 28px;text-align:center">
-        <div style="font-size:48px;line-height:1">🎂</div>
-        <div style="color:#fff;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;margin-top:10px;opacity:0.95">Birthday Globe</div>
+  return `<div style="margin:0;background:#F8F9FA;padding:32px 16px;font-family:Inter,Arial,Helvetica,sans-serif">
+    <div style="max-width:520px;margin:0 auto;border-radius:18px;overflow:hidden;border:1px solid #E2E8F0;background:#FFFFFF;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06)">
+      <div style="background:#0F172A;padding:28px 24px;text-align:center">
+        <div style="color:#10B981;font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:700">Birthday Atlas</div>
       </div>
-      <div style="padding:30px 28px;color:#e7e7f0;font-size:16px;line-height:1.65">
+      <div style="padding:30px 28px;color:#334155;font-size:15px;line-height:1.65">
         ${inner}
         <div style="margin-top:28px;text-align:center">
-          <a href="https://bdday.tech" style="display:inline-block;background:linear-gradient(135deg,#FF4D8D,#A855F7);color:#fff;text-decoration:none;font-weight:600;padding:13px 26px;border-radius:999px">Open Birthday Globe</a>
+          <a href="https://bdday.tech" style="display:inline-block;background:#059669;color:#fff;text-decoration:none;font-weight:600;padding:12px 26px;border-radius:999px">Open Birthday Atlas</a>
         </div>
       </div>
-      <div style="padding:16px;text-align:center;color:#7a7a90;font-size:12px;border-top:1px solid rgba(255,255,255,0.08)">You are receiving this because you use Birthday Globe 🌍</div>
+      <div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px;border-top:1px solid #F1F5F9">You are receiving this update from your Birthday Atlas account.</div>
     </div>
   </div>`
 }
@@ -73,18 +72,18 @@ function buildMessage(task) {
   const when = whenPhrase(days)
   if (task.type === 'self_birthday') {
     return {
-      subject: `🎉 Your birthday ${when}!`,
-      title: `Your birthday ${when}!`,
-      body: 'The world is getting ready to celebrate you. Have an amazing day!',
-      html: emailShell(`<p style="font-size:16px">Hi ${esc(task.recipientName)},</p><p style="font-size:16px">Your birthday <strong>${when}</strong>! 🎈 The world is ready to celebrate you.</p>`),
+      subject: `Your birthday ${when}`,
+      title: `Your birthday ${when}`,
+      body: 'The world is celebrating with you. Wishing you a great day ahead.',
+      html: emailShell(`<p style="font-size:15px">Hi ${esc(task.recipientName)},</p><p style="font-size:15px">Your birthday <strong>${when}</strong>! Wishing you a wonderful celebration ahead.</p>`),
       text: `Hi ${task.recipientName}, your birthday ${when}!`,
     }
   }
   return {
-    subject: `🎂 ${task.subjectName}'s birthday ${when}`,
+    subject: `${task.subjectName}'s birthday ${when}`,
     title: `${task.subjectName}'s birthday ${when}`,
-    body: 'Do not forget to send your wishes!',
-    html: emailShell(`<p style="font-size:16px">Hi ${esc(task.recipientName)},</p><p style="font-size:16px"><strong>${esc(task.subjectName)}</strong>'s birthday <strong>${when}</strong>! 🎉 Do not forget to send your wishes.</p>`),
+    body: 'Be sure to send your best wishes.',
+    html: emailShell(`<p style="font-size:15px">Hi ${esc(task.recipientName)},</p><p style="font-size:15px"><strong>${esc(task.subjectName)}</strong>'s birthday <strong>${when}</strong>. Be sure to reach out with your wishes.</p>`),
     text: `Hi ${task.recipientName}, ${task.subjectName}'s birthday ${when}!`,
   }
 }
