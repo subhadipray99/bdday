@@ -3,8 +3,8 @@ import { Providers } from './providers'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata = {
-  title: 'EPHEMERIS // Global Birthday Atlas & Observatory',
-  description: 'Cartographic temporal atlas and celebration observatory. Track global birthdays across solar transits with precision reminders.',
+  title: 'Birthday Globe — Never miss a birthday, anywhere on Earth',
+  description: 'A global 3D birthday calendar. Add your birthday, see celebrations around the world, follow friends, and get timed email reminders.',
 }
 
 export default function RootLayout({ children }) {
