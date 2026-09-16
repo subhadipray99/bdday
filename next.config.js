@@ -9,6 +9,11 @@ const nextConfig = {
   // Renamed from experimental.serverComponentsExternalPackages in Next 15
   serverExternalPackages: ['mongodb'],
   webpack(config, { dev }) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'prop-types/node_modules/react-is': require.resolve('react-is'),
+      '@radix-ui/react-use-controllable-state/node_modules/@radix-ui/react-use-effect-event': require.resolve('@radix-ui/react-use-effect-event'),
+    };
     if (dev) {
       // Reduce CPU/memory from file watching
       config.watchOptions = {
