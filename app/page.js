@@ -1,32 +1,34 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabaseClient'
 import { COUNTRIES, COUNTRY_MAP } from '@/lib/countries'
 import { toast } from 'sonner'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Globe2, Bell, LogOut, Calendar, Search, Users, UserPlus, UserMinus,
   Twitter, Instagram, MapPin, ChevronLeft, ChevronRight, Loader2, Plus, Trash2,
   CalendarDays, Clock, ArrowRight, Check, Mail, Lock, User, Share2,
   Compass, ExternalLink, SlidersHorizontal, ShieldCheck, Bookmark,
+  Navigation, Crosshair, Radio, Activity, Eye, EyeOff
 } from 'lucide-react'
 
 // Skeleton placeholder while 3D globe component is dynamically loaded
 function GlobeSkeleton() {
   return (
-    <div className="w-full h-[340px] sm:h-[440px] rounded-2xl bg-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full border-2 border-slate-200 border-dashed animate-spin duration-1000" />
-      <div className="absolute inset-0 skeleton-shimmer opacity-40" />
-      <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 z-10 mt-4">Rendering Interactive Atlas</p>
+    <div className="w-full h-[360px] sm:h-[460px] bg-[#F4F4F1] border border-[#E2E8F0] rounded flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <div className="w-48 h-48 sm:w-60 sm:h-60 rounded-full border border-dashed border-[#CBD5E1] animate-spin duration-1000" />
+      <div className="absolute inset-0 skeleton-shimmer opacity-30" />
+      <div className="z-10 mt-4 text-center">
+        <p className="font-mono-code text-[10px] text-[#475569] uppercase tracking-widest">WGS-84 GEODETIC ENGINE</p>
+        <p className="font-mono-code text-xs font-semibold text-[#0F172A] mt-1">INITIALIZING CARTOGRAPHIC ATLAS</p>
+      </div>
     </div>
   )
 }
@@ -49,32 +51,38 @@ function daysUntil(month, day) {
   if (next < today) next = new Date(y + 1, month - 1, day)
   return Math.round((next - today) / 86400000)
 }
-function untilLabel(n) { return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : `in ${n} days` }
+function untilLabel(n) { return n === 0 ? 'TODAY' : n === 1 ? 'TOMORROW' : `IN ${n} DAYS` }
+function getDayOfYear() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  const diff = now - start
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
 
 /* ===== Motion transitions ===== */
 const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } },
 }
 const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.04 } },
 }
 
 /* ===== Bespoke UI Primitives ===== */
 function Button({ variant = 'primary', size = 'md', className = '', children, ...props }) {
-  const base = 'btn-grain gap-2 transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none'
+  const base = 'btn-grain transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none'
   const sizes = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-5 py-2.5 text-sm',
-    lg: 'px-6 py-3.5 text-base',
+    sm: 'px-2.5 py-1 text-[11px]',
+    md: 'px-4 py-2 text-xs',
+    lg: 'px-5 py-2.5 text-xs tracking-wider',
   }
   const variants = {
     primary: 'btn-grain-primary',
-    secondary: 'btn-grain-secondary', // Lush Green Secondary
+    secondary: 'btn-grain-secondary', // Botanical Emerald Green
     'green-soft': 'btn-grain-green-soft',
     outline: 'btn-grain-outline',
-    ghost: 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 shadow-none border-0',
+    ghost: 'bg-transparent text-slate-700 hover:text-black hover:bg-slate-100 shadow-none border-0 normal-case font-medium',
   }
   return (
     <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props}>
@@ -83,21 +91,10 @@ function Button({ variant = 'primary', size = 'md', className = '', children, ..
   )
 }
 
-function IconButton({ className = '', children, ...props }) {
-  return (
-    <button
-      {...props}
-      className={`w-9 h-9 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all duration-150 active:scale-95 ${className}`}
-    >
-      {children}
-    </button>
-  )
-}
-
 function Card({ className = '', children, hover = false, ...props }) {
   return (
     <div
-      className={`editorial-card ${hover ? 'editorial-card-lift cursor-pointer' : ''} ${className}`}
+      className={`archival-plate ${hover ? 'archival-plate-hover cursor-pointer' : ''} ${className}`}
       {...props}
     >
       {children}
@@ -105,108 +102,70 @@ function Card({ className = '', children, hover = false, ...props }) {
   )
 }
 
-function Avatar({ name, size = 'w-10 h-10', text = 'text-sm' }) {
+function Avatar({ name, size = 'w-9 h-9', text = 'text-xs' }) {
   const initial = (name || '?')[0]?.toUpperCase()
   return (
     <div
-      className={`${size} shrink-0 rounded-full bg-slate-900 text-white font-semibold flex items-center justify-center border border-slate-700/40 shadow-sm ${text}`}
+      className={`${size} shrink-0 rounded bg-[#131B2E] text-white font-mono-code font-bold flex items-center justify-center border border-[#0F172A] shadow-sm ${text}`}
     >
       {initial}
     </div>
   )
 }
 
-function Badge({ variant = 'slate', children, className = '' }) {
+function IsoTag({ code, label, className = '' }) {
+  return (
+    <span className={`inline-flex items-center font-mono-code text-[10px] bg-[#F4F4F1] text-[#0F172A] border border-[#CBD5E1] px-1.5 py-0.5 rounded tracking-wider uppercase ${className}`}>
+      [{code || 'GL'}] {label || ''}
+    </span>
+  )
+}
+
+function MilestoneBadge({ children, variant = 'emerald', className = '' }) {
   const styles = {
-    green: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 font-medium',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200/80 font-medium',
-    slate: 'bg-slate-50 text-slate-700 border-slate-200 font-medium',
-    primary: 'bg-slate-900 text-white border-slate-800 font-medium',
+    emerald: 'bg-[#ECFDF5] text-[#065F46] border-[#A7F3D0]',
+    slate: 'bg-[#F4F4F1] text-[#0F172A] border-[#CBD5E1]',
+    obsidian: 'bg-[#0F172A] text-white border-[#0F172A]',
   }
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs border ${styles[variant] || styles.slate} ${className}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border font-mono-code text-[10px] font-bold tracking-wider uppercase ${styles[variant]} ${className}`}>
       {children}
     </span>
   )
 }
 
-function SectionTitle({ icon: Icon, title, subtitle, action }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
-      <div className="flex items-center gap-3">
-        {Icon && (
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-slate-200 shadow-sm text-slate-800">
-            <Icon className="w-5 h-5 text-emerald-600" />
-          </div>
-        )}
-        <div>
-          <h2 className="font-display text-2xl font-bold text-slate-900 tracking-tight">{title}</h2>
-          {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
-        </div>
-      </div>
-      {action && <div>{action}</div>}
-    </div>
-  )
-}
-
-/* ===== Full Page Skeleton Loader (Replacing emoji bouncing cake) ===== */
+/* ===== Full Page Skeleton Loader ===== */
 function AppBootstrapSkeleton() {
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
-      {/* Top bar skeleton */}
-      <header className="h-16 rounded-2xl bg-white border border-slate-200/80 px-6 flex items-center justify-between shadow-sm">
+    <div className="min-h-screen bg-[#FBFBFA] flex flex-col font-sans-body">
+      <div className="w-full bg-[#131B2E] h-7 px-4 flex items-center justify-between border-b border-[#0F172A]">
+        <Skeleton className="w-48 h-3.5 bg-slate-800" />
+        <Skeleton className="w-36 h-3.5 bg-slate-800" />
+      </div>
+      <header className="h-16 border-b border-[#E2E8F0] px-6 flex items-center justify-between bg-white">
         <div className="flex items-center gap-3">
-          <Skeleton className="w-9 h-9 rounded-xl" />
-          <Skeleton className="w-32 h-5 rounded-md" />
+          <Skeleton className="w-8 h-8 rounded" />
+          <div className="space-y-1">
+            <Skeleton className="w-40 h-4" />
+            <Skeleton className="w-24 h-2.5" />
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <Skeleton className="w-36 h-9 rounded-full" />
-          <Skeleton className="w-9 h-9 rounded-full" />
+          <Skeleton className="w-32 h-8 rounded" />
+          <Skeleton className="w-24 h-8 rounded" />
         </div>
       </header>
-
-      {/* Tabs bar skeleton */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="w-24 h-9 rounded-full shrink-0" />
-        ))}
-      </div>
-
-      {/* Main Grid Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 editorial-card p-6 bg-white min-h-[460px] flex flex-col justify-between">
-          <div className="space-y-2">
-            <Skeleton className="w-32 h-4" />
-            <Skeleton className="w-48 h-6" />
-          </div>
-          <div className="h-64 flex items-center justify-center">
-            <Skeleton className="w-56 h-56 rounded-full" />
-          </div>
-          <Skeleton className="w-full h-8" />
+      <div className="p-6 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 archival-plate p-6 space-y-4">
+          <Skeleton className="w-48 h-5" />
+          <Skeleton className="w-full h-80" />
+          <Skeleton className="w-full h-4" />
         </div>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="editorial-card p-5 bg-white space-y-2">
-              <Skeleton className="w-10 h-8" />
-              <Skeleton className="w-20 h-4" />
-            </div>
-            <div className="editorial-card p-5 bg-white space-y-2">
-              <Skeleton className="w-10 h-8" />
-              <Skeleton className="w-20 h-4" />
-            </div>
-          </div>
-          <div className="editorial-card p-5 bg-white space-y-3">
-            <Skeleton className="w-36 h-5" />
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-2">
-                <Skeleton className="w-10 h-10 rounded-full" />
-                <div className="space-y-1.5 flex-1">
-                  <Skeleton className="w-28 h-4" />
-                  <Skeleton className="w-20 h-3" />
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="archival-plate p-6 space-y-4">
+          <Skeleton className="w-36 h-5" />
+          <Skeleton className="w-full h-16" />
+          <Skeleton className="w-full h-16" />
+          <Skeleton className="w-full h-16" />
         </div>
       </div>
     </div>
@@ -290,7 +249,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen relative text-slate-900">
+    <div className="min-h-screen relative bg-[#FBFBFA] text-[#0F172A] font-sans-body antialiased">
       <AnimatePresence mode="wait">
         {screen === 'landing' && (
           <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -310,7 +269,7 @@ export default function App() {
         {screen === 'onboarding' && user && (
           <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <Onboarding user={user} initial={profile} onDone={async (prof) => {
-              setProfile(prof); await refreshUserData(user.id); setScreen('app'); toast.success('Profile created successfully')
+              setProfile(prof); await refreshUserData(user.id); setScreen('app'); toast.success('Observatory coordinates calibrated')
             }} />
           </motion.div>
         )}
@@ -334,165 +293,183 @@ export default function App() {
   )
 }
 
-/* ===== Landing Page (Clean Bright Architectural Design) ===== */
+/* ===== Landing Page (Cartographic Observatory Theme) ===== */
 function Landing({ publicBirthdays, onStart }) {
   const now = new Date(); const tM = now.getMonth() + 1; const tD = now.getDate()
+  const dayOfYear = getDayOfYear()
   const points = useMemo(() => buildGlobePoints(publicBirthdays, tM, tD), [publicBirthdays, tM, tD])
   const todays = publicBirthdays.filter((b) => b.birth_month === tM && b.birth_day === tD)
   const upcoming = publicBirthdays.filter((b) => { const d = daysUntil(b.birth_month, b.birth_day); return d > 0 && d <= 7 }).length
 
-  const features = [
-    {
-      icon: Clock,
-      title: 'Precision Reminders',
-      desc: 'Never forget someone who matters. Get thoughtfully scheduled email updates 3 days, 1 day, or the morning of.',
-    },
-    {
-      icon: Users,
-      title: 'Global Subscriptions',
-      desc: 'Follow collaborators, friends, and creators worldwide. Keep track of international timezones seamlessly.',
-    },
-    {
-      icon: Lock,
-      title: 'Private by Default',
-      desc: 'Record private birthdays for family that only you can see, completely isolated from the public atlas.',
-    },
-  ]
-
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Top Navigation */}
-      <nav className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
-              <Compass className="w-4.5 h-4.5 text-emerald-400" />
-            </div>
-            <span className="font-display font-bold text-lg text-slate-900 tracking-tight">Birthday Atlas</span>
+      {/* Top Running Observatory Telemetry Bar */}
+      <aside aria-label="Geodetic Telemetry" className="w-full bg-[#131B2E] text-[#94A3B8] border-b border-[#0F172A] px-4 py-1 flex items-center justify-between font-mono-code text-[10px] tracking-wider uppercase select-none z-50">
+        <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-[#85F8C4] font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#85F8C4] animate-ping" />
+            WGS-84 GEODETIC DATUM
+          </span>
+          <span className="text-slate-600">/</span>
+          <span className="text-[#A7F3D0]">UTC LIVE SYNCHRONIZED</span>
+          <span className="text-slate-600">/</span>
+          <span className="hidden sm:inline text-slate-300">SOLAR SUBPOINT CALIBRATED</span>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-[#85F8C4] font-semibold">ANNUAL CYCLE: DAY {dayOfYear}/365</span>
+        </div>
+      </aside>
+
+      {/* Cartographic Header */}
+      <header className="flex justify-between items-center w-full px-4 sm:px-8 h-16 border-b border-[#E2E8F0] bg-white z-40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded border border-[#0F172A] flex items-center justify-center bg-[#FBFBFA] text-[#0F172A] shadow-sm">
+            <Compass className="w-4 h-4 text-[#059669]" />
           </div>
-          <div className="flex items-center gap-2.5">
-            <Button variant="ghost" onClick={onStart}>Sign In</Button>
-            <Button variant="primary" onClick={onStart}>Get Started</Button>
+          <div>
+            <div className="font-editorial text-lg font-semibold tracking-tight text-[#0F172A] leading-tight">
+              EPHEMERIS // OBSERVATORY
+            </div>
+            <div className="font-mono-code text-[9px] text-[#64748B] tracking-wider uppercase">
+              CARTOGRAPHIC TEMPORAL ATLAS
+            </div>
           </div>
         </div>
-      </nav>
+
+        <div className="flex items-center gap-3">
+          {/* Live Global Celebrants Pill Ticker */}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] text-[#065F46] font-mono-code text-[11px]">
+            <span className="relative flex h-2 w-2">
+              <span className="radar-beacon absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#059669]" />
+            </span>
+            <span className="font-bold tracking-wider">{todays.length} CELEBRATIONS TODAY</span>
+          </div>
+
+          <Button variant="outline" size="sm" onClick={onStart}>SIGN IN</Button>
+          <Button variant="secondary" size="sm" onClick={onStart}>LOG CELEBRATION</Button>
+        </div>
+      </header>
 
       {/* Hero Section */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-12 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 mb-6"
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-dot-green" />
-          Global Birthday Atlas · Live
-        </motion.div>
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 text-center">
+        <div className="inline-flex items-center gap-2 font-mono-code text-[11px] text-[#065F46] bg-[#ECFDF5] border border-[#A7F3D0] px-3 py-1 rounded mb-5 uppercase tracking-wider">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#059669]" />
+          GLOBAL TEMPORAL ATLAS // WGS-84 CALIBRATED
+        </div>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.05 }}
-          className="font-display text-4xl sm:text-6xl font-bold tracking-tight text-slate-900 leading-[1.1]"
-        >
-          Never miss a birthday.<br />
-          <span className="text-emerald-600">Anywhere in the world.</span>
-        </motion.h1>
+        <h1 className="font-editorial text-4xl sm:text-6xl font-normal tracking-tight text-[#0F172A] leading-[1.12]">
+          Global Birthday Atlas.
+          <span className="block text-[#059669] italic font-editorial text-3xl sm:text-5xl mt-1">
+            An Ephemeris for Human Milestones.
+          </span>
+        </h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.1 }}
-          className="mt-6 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed"
-        >
-          Pin your birthday to an interactive 3D globe, track family and friends across all continents, and receive reliably timed reminder alerts right to your inbox.
-        </motion.p>
+        <p className="mt-5 text-sm sm:text-base text-[#475569] max-w-2xl mx-auto leading-relaxed font-sans-body">
+          Treat birthdays as planetary phenomena. Pin coordinates to an illuminated daylight globe, observe solar returns across international meridians, and dispatch precision reminders before every milestone.
+        </p>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.15 }}
-          className="mt-8 flex items-center justify-center gap-3.5 flex-wrap"
-        >
+        <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
           <Button variant="primary" size="lg" onClick={onStart}>
-            Add your birthday <ArrowRight className="w-4 h-4" />
+            RECORD SOLAR RETURN <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
           </Button>
           <Button variant="secondary" size="lg" onClick={onStart}>
-            <Compass className="w-4 h-4" /> Explore Atlas
+            EXPLORE OBSERVATORY
           </Button>
-        </motion.div>
+        </div>
       </section>
 
-      {/* Bento Showcase */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-20 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Globe Container */}
-          <Card className="lg:col-span-2 p-6 sm:p-8 flex flex-col justify-between overflow-hidden bg-white">
-            <div className="flex items-start justify-between z-10">
-              <div>
-                <Badge variant="green" className="mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> Real-time Atlas
-                </Badge>
-                <h3 className="font-display text-xl sm:text-2xl font-bold text-slate-900">Celebrating Today</h3>
-              </div>
-              <div className="text-right">
-                <span className="font-display text-4xl sm:text-5xl font-bold text-emerald-600">{todays.length}</span>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">people across Earth</p>
-              </div>
+      {/* Main Split Viewport */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-8 pb-16 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column: Daylight Atlas Plate (7 cols) */}
+          <div className="lg:col-span-7 archival-plate overflow-hidden bg-white">
+            <div className="h-10 border-b border-[#E2E8F0] bg-[#F4F4F1] px-4 flex items-center justify-between font-mono-code text-[10px] text-[#475569]">
+              <span className="font-semibold text-[#0F172A] flex items-center gap-1.5 uppercase">
+                <span className="w-1.5 h-1.5 bg-[#059669] inline-block" />
+                DAYLIGHT WGS-84 HORIZON
+              </span>
+              <span>{points.length} MAPPED COORDINATES</span>
             </div>
-            <div className="py-4">
+
+            <div className="p-4 graticule-canvas">
               <GlobeView points={points} />
             </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Drag to rotate · Scroll to zoom</span>
-              <span className="text-emerald-700 font-medium">Green pins indicate celebrations</span>
-            </div>
-          </Card>
 
-          {/* Right Column Features */}
-          <div className="flex flex-col gap-5">
-            {/* Upcoming stat card */}
-            <Card className="p-6 flex items-center justify-between bg-white" hover>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Coming Up</p>
-                <p className="font-display text-3xl sm:text-4xl font-bold text-slate-900 mt-1">{upcoming}</p>
-                <p className="text-sm text-slate-500 mt-0.5">birthdays in the next 7 days</p>
+            <div className="h-10 border-t border-[#E2E8F0] bg-[#F4F4F1] px-4 flex items-center justify-between font-mono-code text-[10px] text-[#475569]">
+              <span>DRAG TO ROTATE PLANETARY PROJECTION</span>
+              <span className="text-[#059669] font-semibold">BOTANICAL PINS ACTIVE</span>
+            </div>
+          </div>
+
+          {/* Right Column: Ephemeris Dossier (5 cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <Card className="p-5 bg-white">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
+                <div>
+                  <span className="font-mono-code text-[10px] text-[#059669] font-bold uppercase tracking-wider block">
+                    DAILY EPHEMERIS DOSSIER
+                  </span>
+                  <h3 className="font-editorial text-xl font-medium text-[#0F172A] mt-0.5">
+                    {todays.length} Active Solar Returns
+                  </h3>
+                </div>
+                <MilestoneBadge variant="emerald">LIVE</MilestoneBadge>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
-                <CalendarDays className="w-6 h-6" />
+
+              <div className="space-y-2.5 max-h-72 overflow-y-auto">
+                {todays.length === 0 && (
+                  <div className="py-8 text-center font-mono-code text-xs text-[#94A3B8]">
+                    No active solar transits today.
+                  </div>
+                )}
+                {todays.slice(0, 5).map((b) => {
+                  const c = COUNTRY_MAP[b.country_code]
+                  return (
+                    <div key={b.id} className="p-3 bg-[#FBFBFA] border border-[#E2E8F0] rounded flex items-center justify-between hover:border-[#0F172A] transition-colors">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={b.display_name} />
+                        <div>
+                          <p className="font-semibold text-xs text-[#0F172A]">{b.display_name}</p>
+                          <p className="font-mono-code text-[10px] text-[#64748B]">
+                            [{b.country_code || 'GL'}] {c ? c.name : 'Earth'}
+                          </p>
+                        </div>
+                      </div>
+                      <MilestoneBadge variant="emerald">ACTIVE</MilestoneBadge>
+                    </div>
+                  )
+                })}
               </div>
             </Card>
 
-            {features.map((f, i) => (
-              <Card key={i} className="p-6 bg-white flex-1 flex flex-col justify-between" hover>
-                <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800">
-                  <f.icon className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div className="mt-4">
-                  <p className="font-semibold text-base text-slate-900">{f.title}</p>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{f.desc}</p>
-                </div>
-              </Card>
-            ))}
+            <Card className="p-5 bg-white">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-3">
+                <span className="font-mono-code text-[10px] text-[#0F172A] font-bold uppercase tracking-wider">
+                  HORIZON MILESTONES (NEXT 7 DAYS)
+                </span>
+                <span className="font-mono-code text-[10px] text-[#64748B]">{upcoming} QUEUED</span>
+              </div>
+              <p className="text-xs text-[#64748B]">
+                Precision email notifications dispatch automatically 3 days, 1 day, or the morning of each celestial transit.
+              </p>
+            </Card>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="mt-auto border-t border-slate-200/80 bg-white py-8 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Compass className="w-4 h-4 text-emerald-600" />
-            <span className="font-semibold text-slate-700">Birthday Atlas</span>
-          </div>
-          <p>© 2025 Birthday Atlas. All rights reserved.</p>
+      {/* Cartographic Footer */}
+      <footer className="mt-auto border-t border-[#E2E8F0] bg-[#F4F4F1] py-4 px-4 sm:px-8 text-center sm:text-left text-[11px] font-mono-code text-[#64748B]">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>EPHEMERIS OBSERVATORY // ISO 8601 TEMPORAL STANDARDS // WGS-84 CALIBRATED</span>
+          <span>CELESTIAL TRANSITS PRESERVED</span>
         </div>
       </footer>
     </div>
   )
 }
 
-/* ===== Auth (Clean Bright Editorial Card) ===== */
+/* ===== Auth (Archival Registry Form) ===== */
 function Auth({ onBack, onAuthed }) {
   const [mode, setMode] = useState('signup')
   const [email, setEmail] = useState('')
@@ -514,7 +491,7 @@ function Auth({ onBack, onAuthed }) {
         if (!data.session) {
           const { data: si, error: se } = await supabase.auth.signInWithPassword({ email, password })
           if (se) {
-            toast.info('Account created. Check your email to confirm, then sign in.')
+            toast.info('Account created. Check your inbox to confirm, then sign in.')
             setMode('login')
             setBusy(false)
             return
@@ -529,105 +506,98 @@ function Auth({ onBack, onAuthed }) {
         onAuthed(data.session)
       }
     } catch (err) {
-      toast.error(err.message || 'Authentication failed')
+      toast.error(err.message || 'Authentication error')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#F8F9FA]">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
-        <Card className="p-8 bg-white">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#FBFBFA]">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+        <Card className="p-8 bg-white border border-[#CBD5E1]">
           <div className="text-center mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto mb-4 shadow-sm">
-              <Compass className="w-6 h-6 text-emerald-400" />
+            <div className="w-10 h-10 rounded border border-[#0F172A] flex items-center justify-center bg-[#FBFBFA] mx-auto mb-3 text-[#0F172A] shadow-sm">
+              <Compass className="w-5 h-5 text-[#059669]" />
             </div>
-            <h2 className="font-display text-2xl font-bold text-slate-900">
-              {mode === 'signup' ? 'Create your account' : 'Welcome back'}
+            <h2 className="font-editorial text-2xl font-medium text-[#0F172A]">
+              {mode === 'signup' ? 'Observatory Enlistment' : 'Observatory Authorization'}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {mode === 'signup' ? 'Join the global birthday directory' : 'Sign in to access your atlas'}
+            <p className="font-mono-code text-[11px] text-[#64748B] mt-1 uppercase">
+              {mode === 'signup' ? 'REGISTER RECORD IN GLOBAL DIRECTORY' : 'ENTER ACCESS CREDENTIALS'}
             </p>
           </div>
 
           <form onSubmit={submit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Your Name</Label>
-                <div className="relative">
-                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Jane Doe"
-                    required
-                    className="editorial-input pl-10"
-                  />
-                </div>
+                <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase tracking-wider block mb-1">
+                  CELEBRANT NAME
+                </label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full Legal or Display Name"
+                  required
+                  className="observatory-input"
+                />
               </div>
             )}
 
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Email Address</Label>
-              <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="jane@example.com"
-                  required
-                  className="editorial-input pl-10"
-                />
-              </div>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase tracking-wider block mb-1">
+                TELEMETRY EMAIL
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="operator@domain.com"
+                required
+                className="observatory-input"
+              />
             </div>
 
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Password</Label>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  minLength={6}
-                  required
-                  className="editorial-input pl-10"
-                />
-              </div>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase tracking-wider block mb-1">
+                SECURITY PASSPHRASE
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+                minLength={6}
+                required
+                className="observatory-input"
+              />
             </div>
 
             <Button
               type="submit"
               variant={mode === 'signup' ? 'secondary' : 'primary'}
               disabled={busy}
-              className="w-full py-3 mt-2"
+              className="w-full py-2.5 mt-2"
             >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'signup' ? 'Create Account' : 'Sign In'}
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'signup' ? 'CONFIRM ENLISTMENT' : 'AUTHORIZE SESSION'}
             </Button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 text-center text-sm text-slate-500">
-            {mode === 'signup' ? 'Already have an account? ' : "Don't have an account? "}
+          <div className="mt-6 pt-4 border-t border-[#E2E8F0] text-center font-mono-code text-xs text-[#64748B]">
+            {mode === 'signup' ? 'Existing operator? ' : 'Unregistered? '}
             <button
-              className="font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+              className="font-bold text-[#059669] hover:underline"
               onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
             >
-              {mode === 'signup' ? 'Sign In' : 'Sign Up'}
+              {mode === 'signup' ? 'SIGN IN' : 'ENLIST NEW'}
             </button>
           </div>
 
           <button
-            className="mt-4 w-full text-center text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            className="mt-3 w-full text-center font-mono-code text-[11px] text-[#94A3B8] hover:text-[#0F172A]"
             onClick={onBack}
           >
-            ← Return to homepage
+            ← RETURN TO OBSERVATORY ATLAS
           </button>
         </Card>
       </motion.div>
@@ -635,7 +605,7 @@ function Auth({ onBack, onAuthed }) {
   )
 }
 
-/* ===== Onboarding (Clean Bright Form) ===== */
+/* ===== Onboarding ===== */
 function Onboarding({ user, initial, onDone }) {
   const [name, setName] = useState(initial?.display_name || user.user_metadata?.display_name || '')
   const [month, setMonth] = useState(initial?.birth_month ? String(initial.birth_month) : '')
@@ -651,7 +621,7 @@ function Onboarding({ user, initial, onDone }) {
 
   async function save() {
     if (!name || !month || !day || !country) {
-      toast.error('Please complete your name, birthday and country')
+      toast.error('Name, date, and country coordinates are required')
       return
     }
     setBusy(true)
@@ -684,41 +654,41 @@ function Onboarding({ user, initial, onDone }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#F8F9FA]">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
-        <Card className="p-8 bg-white">
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="green">Profile Setup</Badge>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#FBFBFA]">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
+        <Card className="p-8 bg-white border border-[#CBD5E1]">
+          <div className="mb-6 pb-4 border-b border-[#E2E8F0]">
+            <MilestoneBadge variant="emerald" className="mb-2">PROFILE CALIBRATION</MilestoneBadge>
+            <h2 className="font-editorial text-2xl font-medium text-[#0F172A]">Record Solar Coordinates</h2>
+            <p className="font-mono-code text-[11px] text-[#64748B] mt-1 uppercase">ESTABLISH YOUR ORBITAL ANNIVERSARY</p>
           </div>
-          <h2 className="font-display text-2xl font-bold text-slate-900">Add Your Birthday</h2>
-          <p className="text-sm text-slate-500 mb-6">Create your personal point on the global atlas.</p>
 
           <div className="space-y-4">
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Display Name</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Display Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Your full name"
-                className="editorial-input"
+                placeholder="Full name"
+                className="observatory-input"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <div>
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Month</Label>
+                <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Month</label>
                 <Select value={month} onValueChange={(v) => { setMonth(v); setDay('') }}>
-                  <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Month" /></SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
+                  <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Month" /></SelectTrigger>
+                  <SelectContent className="bg-white border-[#CBD5E1]">
                     {MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Day</Label>
+                <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Day</label>
                 <Select value={day} onValueChange={setDay}>
-                  <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Day" /></SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200 max-h-60">
+                  <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Day" /></SelectTrigger>
+                  <SelectContent className="bg-white border-[#CBD5E1] max-h-56">
                     {Array.from({ length: dayCount }, (_, i) => i + 1).map((d) => (
                       <SelectItem key={d} value={String(d)}>{d}</SelectItem>
                     ))}
@@ -726,33 +696,25 @@ function Onboarding({ user, initial, onDone }) {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Year</Label>
+                <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Year</label>
                 <input
                   type="number"
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
                   placeholder="Optional"
-                  className="editorial-input"
+                  className="observatory-input"
                 />
               </div>
             </div>
 
-            <ToggleRow
-              title="Display birth year"
-              desc="If turned off, your exact age remains confidential"
-              checked={yearPublic}
-              onChange={setYearPublic}
-              disabled={!year}
-            />
-
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Country</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Geographic Location</label>
               <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Select location" /></SelectTrigger>
-                <SelectContent className="bg-white border-slate-200 max-h-60">
+                <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Select ISO Location" /></SelectTrigger>
+                <SelectContent className="bg-white border-[#CBD5E1] max-h-56">
                   {COUNTRIES.map((c) => (
                     <SelectItem key={c.code} value={c.code}>
-                      <span className="font-mono text-xs text-slate-400 mr-2">[{c.code}]</span> {c.name}
+                      <span className="font-mono-code text-[10px] text-[#64748B] mr-2">[{c.code}]</span> {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -761,43 +723,25 @@ function Onboarding({ user, initial, onDone }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                  <Twitter className="w-3 h-3 text-slate-400" /> X Handle
-                </Label>
-                <input
-                  value={x}
-                  onChange={(e) => setX(e.target.value)}
-                  placeholder="@handle"
-                  className="editorial-input"
-                />
+                <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">X Handle</label>
+                <input value={x} onChange={(e) => setX(e.target.value)} placeholder="@handle" className="observatory-input" />
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                  <Instagram className="w-3 h-3 text-slate-400" /> Instagram
-                </Label>
-                <input
-                  value={ig}
-                  onChange={(e) => setIg(e.target.value)}
-                  placeholder="@handle"
-                  className="editorial-input"
-                />
+                <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Instagram</label>
+                <input value={ig} onChange={(e) => setIg(e.target.value)} placeholder="@handle" className="observatory-input" />
               </div>
             </div>
 
-            <ToggleRow
-              title="Publish to Global Atlas"
-              desc="Allows friends and people worldwide to find you and send wishes"
-              checked={isPublic}
-              onChange={setIsPublic}
-            />
+            <div className="p-3 bg-[#F4F4F1] border border-[#E2E8F0] rounded flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-xs text-[#0F172A]">Public Cartographic Beacon</p>
+                <p className="font-mono-code text-[10px] text-[#64748B]">Pins your solar return to the global 3D atlas</p>
+              </div>
+              <Switch checked={isPublic} onCheckedChange={setIsPublic} className="data-[state=checked]:bg-[#059669]" />
+            </div>
 
-            <Button
-              onClick={save}
-              variant="secondary"
-              disabled={busy}
-              className="w-full py-3.5 text-sm mt-2"
-            >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Join Global Atlas <ArrowRight className="w-4 h-4" /></>}
+            <Button onClick={save} variant="secondary" disabled={busy} className="w-full py-2.5 mt-2">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ENTER INTO ATLAS RECORD'}
             </Button>
           </div>
         </Card>
@@ -806,7 +750,7 @@ function Onboarding({ user, initial, onDone }) {
   )
 }
 
-/* ===== Dashboard (Refined Bright Editorial Architecture) ===== */
+/* ===== Dashboard ===== */
 function Dashboard({ user, profile, setProfile, publicBirthdays, followedIds, personal, notifications, reload, onLogout }) {
   const [tab, setTab] = useState('globe')
   const [mode, setMode] = useState('global')
@@ -814,19 +758,20 @@ function Dashboard({ user, profile, setProfile, publicBirthdays, followedIds, pe
   const [notifOpen, setNotifOpen] = useState(false)
   const unread = notifications.filter((n) => !n.read_at).length
   const now = new Date(); const tM = now.getMonth() + 1; const tD = now.getDate()
+  const dayOfYear = getDayOfYear()
 
   async function follow(id) {
     if (id === user.id) { toast.info('That is your own profile'); return }
     const { error } = await supabase.from('follows').insert({ follower_id: user.id, followed_id: id })
     if (error) { toast.error(error.message); return }
-    toast.success('Subscribed to reminders')
+    toast.success('Subscribed to solar returns')
     reload()
   }
 
   async function unfollow(id) {
     const { error } = await supabase.from('follows').delete().eq('follower_id', user.id).eq('followed_id', id)
     if (error) { toast.error(error.message); return }
-    toast.success('Unsubscribed')
+    toast.success('Unsubscribed from profile')
     reload()
   }
 
@@ -836,134 +781,138 @@ function Dashboard({ user, profile, setProfile, publicBirthdays, followedIds, pe
   }
 
   const tabDef = [
-    { v: 'globe', icon: Globe2, label: 'Atlas' },
-    { v: 'upcoming', icon: CalendarDays, label: 'Upcoming' },
-    { v: 'calendar', icon: Calendar, label: 'Calendar' },
-    { v: 'discover', icon: Search, label: 'Discover' },
-    { v: 'personal', icon: Users, label: 'My Circle' },
-    { v: 'profile', icon: User, label: 'Settings' },
+    { v: 'globe', label: 'Atlas Viewport', icon: Globe2 },
+    { v: 'upcoming', label: 'Ephemeris Feed', icon: CalendarDays },
+    { v: 'calendar', label: 'Solar Circles', icon: Calendar },
+    { v: 'discover', label: 'Discovery Reticle', icon: Search },
+    { v: 'personal', label: 'Sovereign Circles', icon: Users },
+    { v: 'profile', label: 'Observatory Log', icon: User },
   ]
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-16">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
-              <Compass className="w-4.5 h-4.5 text-emerald-400" />
+    <div className="min-h-screen bg-[#FBFBFA] flex flex-col">
+      {/* Geodetic Telemetry Bar */}
+      <aside aria-label="Geodetic Telemetry" className="w-full bg-[#131B2E] text-[#94A3B8] border-b border-[#0F172A] px-4 py-1 flex items-center justify-between font-mono-code text-[10px] tracking-wider uppercase select-none z-50">
+        <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 text-[#85F8C4] font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#85F8C4] animate-ping" />
+            OBSERVATORY ACTIVE
+          </span>
+          <span className="text-slate-600">/</span>
+          <span className="text-[#A7F3D0]">UTC LIVE</span>
+          <span className="text-slate-600">/</span>
+          <span className="hidden sm:inline">DAY {dayOfYear} OF 365</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white font-mono-code text-[10px]">{user?.email}</span>
+        </div>
+      </aside>
+
+      {/* Main Observatory Navigation */}
+      <header className="flex justify-between items-center w-full px-4 sm:px-6 h-16 border-b border-[#E2E8F0] bg-white z-40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded border border-[#0F172A] flex items-center justify-center bg-[#FBFBFA] text-[#0F172A] shadow-sm">
+            <Compass className="w-4 h-4 text-[#059669]" />
+          </div>
+          <div>
+            <div className="font-editorial text-base font-semibold tracking-tight text-[#0F172A] leading-tight">
+              EPHEMERIS // OBSERVATORY
             </div>
-            <span className="hidden sm:inline font-display font-bold text-lg text-slate-900 tracking-tight">Birthday Atlas</span>
+            <div className="font-mono-code text-[9px] text-[#64748B] tracking-wider uppercase">
+              CARTOGRAPHIC DISPATCH
+            </div>
           </div>
+        </div>
 
-          {/* Mode switch */}
-          <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 border border-slate-200/80">
-            {[
-              { v: 'global', label: 'Global', icon: Globe2 },
-              { v: 'personal', label: 'Personal', icon: Lock },
-            ].map((o) => (
-              <button
-                key={o.v}
-                onClick={() => setMode(o.v)}
-                className={`relative inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-                  mode === o.v
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <o.icon className="w-3.5 h-3.5" /> {o.label}
+        {/* Global vs Sovereign Circles Mode Pill */}
+        <div className="inline-flex rounded border border-[#CBD5E1] bg-[#F4F4F1] p-0.5 shadow-sm font-mono-code text-[11px]">
+          <button
+            onClick={() => setMode('global')}
+            className={`px-3 py-1 rounded transition-colors ${mode === 'global' ? 'bg-[#0F172A] text-white font-semibold' : 'text-[#64748B] hover:text-[#0F172A]'}`}
+          >
+            GLOBAL ATLAS
+          </button>
+          <button
+            onClick={() => setMode('personal')}
+            className={`px-3 py-1 rounded transition-colors ${mode === 'personal' ? 'bg-[#0F172A] text-white font-semibold' : 'text-[#64748B] hover:text-[#0F172A]'}`}
+          >
+            SOVEREIGN CIRCLES
+          </button>
+        </div>
+
+        {/* Trailing Controls */}
+        <div className="flex items-center gap-2">
+          <Popover open={notifOpen} onOpenChange={setNotifOpen}>
+            <PopoverTrigger asChild>
+              <button className="w-8 h-8 rounded border border-[#CBD5E1] flex items-center justify-center text-[#0F172A] hover:bg-[#F4F4F1] relative transition-colors">
+                <Bell className="w-4 h-4" />
+                {unread > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#059669]" />
+                )}
               </button>
-            ))}
-          </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 rounded bg-white border border-[#CBD5E1] shadow-lg p-3 font-sans-body" align="end">
+              <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] mb-2 font-mono-code text-xs">
+                <span className="font-bold text-[#0F172A]">TELEMETRY NOTIFICATIONS</span>
+                {unread > 0 && (
+                  <button onClick={markAllRead} className="text-[#059669] hover:underline font-semibold text-[10px]">
+                    CLEAR UNREAD
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1 max-h-72 overflow-y-auto">
+                {notifications.length === 0 && (
+                  <p className="py-6 text-center font-mono-code text-xs text-[#94A3B8]">No incoming alerts.</p>
+                )}
+                {notifications.map((n) => (
+                  <div key={n.id} className={`p-2 rounded border text-xs ${n.read_at ? 'bg-white border-transparent' : 'bg-[#ECFDF5] border-[#A7F3D0]'}`}>
+                    <p className="font-semibold text-[#0F172A]">{n.title}</p>
+                    {n.body && <p className="text-[11px] text-[#64748B] mt-0.5">{n.body}</p>}
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
 
-          {/* User actions */}
-          <div className="flex items-center gap-1.5">
-            <Popover open={notifOpen} onOpenChange={setNotifOpen}>
-              <PopoverTrigger asChild>
-                <IconButton className="relative">
-                  <Bell className="w-4.5 h-4.5 text-slate-700" />
-                  {unread > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-                  )}
-                </IconButton>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 rounded-2xl bg-white border border-slate-200 shadow-xl p-3" align="end">
-                <div className="flex items-center justify-between mb-2.5 px-2">
-                  <span className="font-semibold text-sm text-slate-900">Notifications</span>
-                  {unread > 0 && (
-                    <button onClick={markAllRead} className="text-xs font-medium text-emerald-600 hover:underline">
-                      Mark all as read
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-1 max-h-80 overflow-y-auto">
-                  {notifications.length === 0 && (
-                    <div className="py-8 text-center text-slate-400">
-                      <Bell className="w-6 h-6 mx-auto mb-1.5 text-slate-300" />
-                      <p className="text-xs">No alerts yet</p>
-                    </div>
-                  )}
-                  {notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      className={`p-2.5 rounded-xl border transition-colors ${
-                        n.read_at ? 'bg-white border-transparent' : 'bg-emerald-50/50 border-emerald-100'
-                      }`}
-                    >
-                      <p className="font-medium text-xs text-slate-900 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-emerald-600" /> {n.title}
-                      </p>
-                      {n.body && <p className="text-xs text-slate-500 mt-1">{n.body}</p>}
-                    </div>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <IconButton onClick={onLogout} title="Sign Out">
-              <LogOut className="w-4.5 h-4.5 text-slate-700" />
-            </IconButton>
-          </div>
+          <button
+            onClick={onLogout}
+            title="Sign Out"
+            className="w-8 h-8 rounded border border-[#CBD5E1] flex items-center justify-center text-[#0F172A] hover:bg-[#F4F4F1] transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        {/* Responsive Tabs Navigation */}
-        <div className="mb-6 overflow-x-auto pb-1 scrollbar-none">
-          <div className="inline-flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-full border border-slate-300/60">
-            {tabDef.map((t) => (
-              <button
-                key={t.v}
-                onClick={() => setTab(t.v)}
-                className={`relative inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
-                  tab === t.v ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tab === t.v && (
-                  <motion.div
-                    layoutId="activeTabPill"
-                    className="absolute inset-0 rounded-full bg-white shadow-sm"
-                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                  />
-                )}
-                <span className="relative flex items-center gap-1.5">
-                  <t.icon className={`w-3.5 h-3.5 ${tab === t.v ? 'text-emerald-600' : ''}`} />
-                  {t.label}
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Cartographic Tab Navigation Bar */}
+      <nav className="w-full px-4 sm:px-6 border-b border-[#E2E8F0] bg-[#F4F4F1] overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 py-1">
+          {tabDef.map((t) => (
+            <button
+              key={t.v}
+              onClick={() => setTab(t.v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-mono-code text-[11px] uppercase tracking-wider rounded transition-all whitespace-nowrap ${
+                tab === t.v
+                  ? 'bg-white text-[#0F172A] font-bold border border-[#CBD5E1] shadow-sm'
+                  : 'text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              <t.icon className={`w-3.5 h-3.5 ${tab === t.v ? 'text-[#059669]' : ''}`} />
+              {t.label}
+            </button>
+          ))}
         </div>
+      </nav>
 
-        {/* Tab Body */}
+      {/* Main Viewport Content */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={tab + mode}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.18 }}
           >
             {tab === 'globe' && <GlobeTab publicBirthdays={publicBirthdays} tM={tM} tD={tD} onSelect={setSelected} />}
             {tab === 'upcoming' && <UpcomingTab mode={mode} publicBirthdays={publicBirthdays} followedIds={followedIds} personal={personal} profile={profile} onSelect={setSelected} />}
@@ -975,7 +924,7 @@ function Dashboard({ user, profile, setProfile, publicBirthdays, followedIds, pe
         </AnimatePresence>
       </main>
 
-      {/* Person Details Dialog */}
+      {/* Person Dossier Modal */}
       <PersonDialog
         person={selected}
         onClose={() => setSelected(null)}
@@ -988,95 +937,114 @@ function Dashboard({ user, profile, setProfile, publicBirthdays, followedIds, pe
   )
 }
 
-/* ===== Globe Tab (Bright Split Layout) ===== */
+/* ===== Globe Tab (Cartographic Observatory Split Layout) ===== */
 function GlobeTab({ publicBirthdays, tM, tD, onSelect }) {
   const points = useMemo(() => buildGlobePoints(publicBirthdays, tM, tD), [publicBirthdays, tM, tD])
   const todays = publicBirthdays.filter((b) => b.birth_month === tM && b.birth_day === tD)
   const week = publicBirthdays.filter((b) => { const d = daysUntil(b.birth_month, b.birth_day); return d > 0 && d <= 7 })
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* 3D Atlas */}
-      <Card className="lg:col-span-2 p-6 flex flex-col justify-between bg-white overflow-hidden">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <Badge variant="green" className="mb-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" /> Live Atlas
-            </Badge>
-            <h3 className="font-display font-bold text-lg text-slate-900">Global Celebrations</h3>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* 3D Atlas Viewport (7 cols) */}
+      <div className="lg:col-span-7 archival-plate overflow-hidden bg-white">
+        <div className="h-11 border-b border-[#E2E8F0] bg-[#F4F4F1] px-4 flex items-center justify-between font-mono-code text-[10px] text-[#475569]">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#0F172A] uppercase flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-[#059669] inline-block" />
+              WGS-84 DAYLIGHT HORIZON
+            </span>
           </div>
-          <span className="text-xs text-slate-500">Green pins indicate celebrations today</span>
+          <span className="text-[#059669] font-semibold">{todays.length} ACTIVE TRANSITS</span>
         </div>
-        <div className="py-2">
+
+        <div className="p-3 graticule-canvas relative">
           <GlobeView points={points} onPointClick={(p) => onSelect(p.data)} />
         </div>
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Click any pin to inspect profile</span>
-          <span>{points.length} total mapped coordinates</span>
-        </div>
-      </Card>
 
-      {/* Right Column Feed */}
-      <div className="space-y-4">
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="p-5 bg-white" hover>
-            <p className="font-display text-3xl font-bold text-emerald-600">{todays.length}</p>
-            <p className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">Today</p>
-          </Card>
-          <Card className="p-5 bg-white" hover>
-            <p className="font-display text-3xl font-bold text-amber-600">{week.length}</p>
-            <p className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">Next 7 Days</p>
-          </Card>
+        <div className="h-10 border-t border-[#E2E8F0] bg-[#F4F4F1] px-4 flex items-center justify-between font-mono-code text-[10px] text-[#64748B]">
+          <span>CLICK LOCATION PIN FOR DOSSIER</span>
+          <span>BOTANICAL RADAR sweep active</span>
         </div>
+      </div>
 
-        {/* Today's Celebrants */}
+      {/* Daily Ephemeris Dossier (5 cols) */}
+      <div className="lg:col-span-5 space-y-4">
         <Card className="p-5 bg-white">
-          <div className="flex items-center justify-between mb-3.5 pb-2 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-dot-green" />
-              <span className="font-semibold text-sm text-slate-900">Today · {MONTH_ABBR[tM - 1]} {tD}</span>
+          <div className="flex items-start justify-between pb-3 border-b border-[#E2E8F0] mb-4">
+            <div>
+              <span className="font-mono-code text-[10px] text-[#059669] font-bold uppercase tracking-wider block">
+                DAILY EPHEMERIS DOSSIER
+              </span>
+              <h2 className="font-editorial text-xl font-medium text-[#0F172A] mt-0.5">
+                {MONTHS[tM - 1]} {tD} Celebrations
+              </h2>
             </div>
-            <span className="text-xs text-slate-500 font-medium">{todays.length} active</span>
+            <MilestoneBadge variant="emerald">{todays.length} ACTIVE</MilestoneBadge>
           </div>
 
-          <div className="space-y-2 max-h-[360px] overflow-y-auto">
+          <div className="space-y-3 max-h-[380px] overflow-y-auto">
             {todays.length === 0 && (
-              <div className="py-12 text-center text-slate-400">
-                <CalendarDays className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <p className="text-xs font-medium text-slate-500">No public birthdays today</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Explore the Discover tab to follow users</p>
+              <div className="py-12 text-center font-mono-code text-xs text-[#94A3B8]">
+                No public solar transits currently in meridian.
               </div>
             )}
-            {todays.map((b) => (
-              <PersonRow key={b.id} b={b} onClick={() => onSelect(b)} />
+            {todays.map((b) => {
+              const c = COUNTRY_MAP[b.country_code]
+              return (
+                <article
+                  key={b.id}
+                  onClick={() => onSelect(b)}
+                  className="p-3.5 bg-[#FBFBFA] border border-[#E2E8F0] rounded hover:border-[#0F172A] transition-all cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={b.display_name} />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-xs text-[#0F172A] group-hover:text-[#059669] transition-colors">
+                            {b.display_name}
+                          </span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#059669]" />
+                        </div>
+                        <p className="font-mono-code text-[10px] text-[#64748B] mt-0.5">
+                          [{b.country_code || 'GL'}] {c ? c.name : 'Global'}
+                        </p>
+                      </div>
+                    </div>
+                    <MilestoneBadge variant="emerald">SOLAR RETURN</MilestoneBadge>
+                  </div>
+
+                  {/* Solar day transit indicator bar */}
+                  <div className="mt-3 pt-2 border-t border-[#E2E8F0] flex items-center justify-between font-mono-code text-[10px] text-[#64748B]">
+                    <span>SOLAR TRANSIT IN PROGRESS</span>
+                    <span className="text-[#059669] font-bold">ACTIVE NOW →</span>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </Card>
+
+        {/* Incoming Telemetry Feeds Skeleton (demonstrating real-time streaming) */}
+        <Card className="p-4 bg-white">
+          <div className="flex items-center justify-between font-mono-code text-[10px] text-[#64748B] mb-2.5">
+            <span className="font-bold text-[#0F172A] uppercase flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-ping" />
+              UPCOMING HORIZON (NEXT 7 DAYS)
+            </span>
+            <span>{week.length} QUEUED</span>
+          </div>
+          <div className="space-y-2">
+            {week.slice(0, 2).map((w, i) => (
+              <div key={i} className="p-2 bg-[#F4F4F1] border border-[#E2E8F0] rounded flex items-center justify-between font-mono-code text-xs">
+                <span className="font-semibold text-[#0F172A]">{w.display_name}</span>
+                <span className="text-[#059669] font-bold">T-MINUS {daysUntil(w.birth_month, w.birth_day)}D</span>
+              </div>
             ))}
           </div>
         </Card>
       </div>
     </div>
-  )
-}
-
-function PersonRow({ b, onClick }) {
-  const c = COUNTRY_MAP[b.country_code]
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all duration-150 group"
-    >
-      <Avatar name={b.display_name} size="w-9 h-9" text="text-xs" />
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-sm text-slate-900 truncate group-hover:text-emerald-700 transition-colors">
-          {b.display_name}
-        </p>
-        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-          <MapPin className="w-3 h-3 text-slate-400" />
-          {c ? `${b.country_code} · ${c.name}` : 'Global'}
-        </p>
-      </div>
-      <Badge variant="green" className="text-[11px] shrink-0">Today</Badge>
-    </button>
   )
 }
 
@@ -1089,7 +1057,7 @@ function buildEntries(mode, publicBirthdays, followedIds, personal, profile) {
   if (profile?.birth_month) {
     list.push({
       id: 'me',
-      name: `${profile.display_name || 'You'} (You)`,
+      name: `${profile.display_name || 'You'} (Self)`,
       birth_month: profile.birth_month,
       birth_day: profile.birth_day,
       source: 'self',
@@ -1113,7 +1081,7 @@ function buildEntries(mode, publicBirthdays, followedIds, personal, profile) {
   return list
 }
 
-/* ===== Upcoming Tab (Clean Chronological Grid) ===== */
+/* ===== Upcoming Tab (Ephemeris Feed) ===== */
 function UpcomingTab({ mode, publicBirthdays, followedIds, personal, profile, onSelect }) {
   const entries = useMemo(
     () => buildEntries(mode, publicBirthdays, followedIds, personal, profile),
@@ -1127,21 +1095,25 @@ function UpcomingTab({ mode, publicBirthdays, followedIds, personal, profile, on
   }, [entries])
 
   return (
-    <div>
-      <SectionTitle
-        icon={CalendarDays}
-        title="Next 7 Days"
-        subtitle={`${upcoming.length} celebrations scheduled across your ${mode} view`}
-      />
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-3 border-b border-[#E2E8F0]">
+        <div>
+          <span className="font-mono-code text-[10px] text-[#059669] font-bold uppercase tracking-wider block">
+            ORBITAL HORIZON FORECAST
+          </span>
+          <h2 className="font-editorial text-2xl font-medium text-[#0F172A] mt-0.5">
+            Approaching Transits ({upcoming.length})
+          </h2>
+        </div>
+        <span className="font-mono-code text-xs text-[#64748B]">SCOPE: {mode.toUpperCase()}</span>
+      </div>
 
       {upcoming.length === 0 && (
         <Card className="p-16 text-center bg-white">
-          <CalendarDays className="w-10 h-10 mx-auto text-slate-300 mb-3" />
-          <h3 className="font-semibold text-base text-slate-800">No celebrations in the next week</h3>
-          <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-            {mode === 'global'
-              ? 'Invite colleagues or explore the discover tab to follow more people.'
-              : 'Add private records under "My Circle" or subscribe to profiles.'}
+          <CalendarDays className="w-8 h-8 mx-auto text-[#94A3B8] mb-2" />
+          <p className="font-editorial text-lg text-[#0F172A]">No transits in the next 7 days</p>
+          <p className="font-mono-code text-xs text-[#64748B] mt-1">
+            Enlist private contacts in Sovereign Circles or subscribe to celebrants.
           </p>
         </Card>
       )}
@@ -1158,34 +1130,38 @@ function UpcomingTab({ mode, publicBirthdays, followedIds, personal, profile, on
           return (
             <motion.div key={i} variants={fadeUp}>
               <Card
-                className="p-5 bg-white"
+                className="p-4 bg-white"
                 hover={clickable}
                 onClick={() => clickable && onSelect(e)}
               >
-                <div className="flex items-center justify-between mb-3.5">
-                  <Badge variant={e.days === 0 ? 'green' : e.days <= 2 ? 'amber' : 'slate'}>
-                    {e.days === 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" />}
+                <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono-code text-[10px] font-bold text-[#64748B]">
+                      {MONTH_ABBR[e.birth_month - 1]} {e.birth_day}
+                    </span>
+                  </div>
+                  <MilestoneBadge variant={e.days === 0 ? 'emerald' : 'slate'}>
                     {untilLabel(e.days)}
-                  </Badge>
-                  <span className="text-xs font-semibold text-slate-500">
-                    {MONTH_ABBR[e.birth_month - 1]} {e.birth_day}
-                  </span>
+                  </MilestoneBadge>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <Avatar name={e.name} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm text-slate-900 truncate">{e.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    <p className="font-semibold text-xs text-[#0F172A] truncate">{e.name}</p>
+                    <p className="font-mono-code text-[10px] text-[#64748B] mt-0.5 truncate">
                       {e.source === 'personal'
-                        ? e.relationship || 'Private Record'
+                        ? e.relationship || 'Confidential'
                         : c
-                        ? `${e.country_code} · ${c.name}`
-                        : e.source === 'self'
-                        ? 'Your birthday'
-                        : 'Global'}
+                        ? `[${e.country_code}] ${c.name}`
+                        : 'Sovereign Contact'}
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-[#F4F4F1] flex items-center justify-between font-mono-code text-[10px] text-[#64748B]">
+                  <span>T-MINUS {e.days * 24}H 00M</span>
+                  <span className="text-[#059669] font-bold">INSPECT →</span>
                 </div>
               </Card>
             </motion.div>
@@ -1196,7 +1172,7 @@ function UpcomingTab({ mode, publicBirthdays, followedIds, personal, profile, on
   )
 }
 
-/* ===== Calendar Tab (Clean Editorial Month Grid) ===== */
+/* ===== Calendar Tab (Solar Circles) ===== */
 function CalendarTab({ mode, publicBirthdays, followedIds, personal, profile, onSelect, tM, tD }) {
   const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1)
   const entries = useMemo(
@@ -1208,7 +1184,8 @@ function CalendarTab({ mode, publicBirthdays, followedIds, personal, profile, on
     entries
       .filter((e) => e.birth_month === viewMonth)
       .forEach((e) => {
-        ;(map[e.birth_day] = map[e.birth_day] || []).push(e)
+        map[e.birth_day] = map[e.birth_day] || []
+        map[e.birth_day].push(e)
       })
     return map
   }, [entries, viewMonth])
@@ -1221,51 +1198,51 @@ function CalendarTab({ mode, publicBirthdays, followedIds, personal, profile, on
 
   return (
     <Card className="p-6 bg-white">
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-4 border-b border-[#E2E8F0] mb-5">
         <div>
-          <h2 className="font-display text-2xl font-bold text-slate-900">{MONTHS[viewMonth - 1]}</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {mode === 'global' ? 'Displaying public birthdays worldwide' : 'Displaying personal & followed contacts'}
-          </p>
+          <span className="font-mono-code text-[10px] text-[#059669] font-bold uppercase tracking-wider block">
+            MONTHLY EPHEMERIS GRID
+          </span>
+          <h2 className="font-editorial text-2xl font-medium text-[#0F172A] mt-0.5">
+            {MONTHS[viewMonth - 1]} 2025
+          </h2>
         </div>
-        <div className="flex items-center gap-1">
-          <IconButton onClick={() => setViewMonth((m) => (m === 1 ? 12 : m - 1))}>
-            <ChevronLeft className="w-4 h-4" />
-          </IconButton>
-          <IconButton onClick={() => setViewMonth((m) => (m === 12 ? 1 : m + 1))}>
-            <ChevronRight className="w-4 h-4" />
-          </IconButton>
+        <div className="flex items-center gap-1.5 font-mono-code text-xs">
+          <Button variant="outline" size="sm" onClick={() => setViewMonth((m) => (m === 1 ? 12 : m - 1))}>
+            PREV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setViewMonth((m) => (m === 12 ? 1 : m + 1))}>
+            NEXT
+          </Button>
         </div>
       </div>
 
-      {/* Days of Week Header */}
-      <div className="grid grid-cols-7 gap-1.5 mb-2 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+      <div className="grid grid-cols-7 gap-1 mb-2 text-center font-mono-code text-[10px] text-[#64748B] uppercase tracking-wider">
         {DOW.map((d) => (
-          <div key={d} className="py-1">{d}</div>
+          <div key={d} className="py-1 bg-[#F4F4F1] rounded font-bold">{d}</div>
         ))}
       </div>
 
-      {/* Grid of Days */}
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((d, i) => {
-          if (!d) return <div key={i} className="min-h-[88px] bg-slate-50/50 rounded-xl border border-transparent" />
+          if (!d) return <div key={i} className="min-h-[86px] bg-[#FBFBFA] border border-transparent rounded" />
           const list = byDay[d] || []
           const isToday = viewMonth === tM && d === tD
 
           return (
             <div
               key={i}
-              className={`min-h-[88px] rounded-xl p-2 transition-colors border ${
+              className={`min-h-[86px] p-2 rounded border transition-colors ${
                 isToday
-                  ? 'bg-emerald-50/60 border-emerald-300 ring-1 ring-emerald-400/30'
-                  : 'bg-white border-slate-200/70 hover:border-slate-300'
+                  ? 'bg-[#ECFDF5] border-[#059669] shadow-sm'
+                  : 'bg-white border-[#E2E8F0] hover:border-[#0F172A]'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className={`text-xs font-semibold ${isToday ? 'text-emerald-700' : 'text-slate-600'}`}>
+              <div className="flex items-center justify-between font-mono-code text-xs">
+                <span className={`font-bold ${isToday ? 'text-[#059669]' : 'text-[#0F172A]'}`}>
                   {d}
                 </span>
-                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-[#059669]" />}
               </div>
 
               <div className="space-y-1 mt-1.5">
@@ -1273,15 +1250,15 @@ function CalendarTab({ mode, publicBirthdays, followedIds, personal, profile, on
                   <button
                     key={idx}
                     onClick={() => (e.source === 'public' || e.source === 'subscribed') && onSelect(e)}
-                    className="w-full truncate text-left text-[11px] font-medium px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 transition-colors"
+                    className="w-full truncate text-left font-mono-code text-[10px] px-1 py-0.5 rounded bg-[#F4F4F1] hover:bg-[#059669] hover:text-white text-[#0F172A] transition-colors block"
                   >
                     {e.name}
                   </button>
                 ))}
                 {list.length > 2 && (
-                  <div className="text-[10px] text-slate-400 font-medium px-1">
-                    +{list.length - 2} more
-                  </div>
+                  <span className="font-mono-code text-[9px] text-[#64748B] block">
+                    +{list.length - 2} MORE
+                  </span>
                 )}
               </div>
             </div>
@@ -1292,7 +1269,7 @@ function CalendarTab({ mode, publicBirthdays, followedIds, personal, profile, on
   )
 }
 
-/* ===== Discover Tab (With Skeleton State) ===== */
+/* ===== Discover Tab (Discovery Reticle) ===== */
 function DiscoverTab({ user, followedIds, follow, unfollow, onSelect }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
@@ -1320,35 +1297,42 @@ function DiscoverTab({ user, followedIds, follow, unfollow, onSelect }) {
   }, [search])
 
   return (
-    <div>
-      <SectionTitle
-        icon={Search}
-        title="Discover People"
-        subtitle="Search and subscribe to colleagues, friends, and creators"
-      />
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-3 border-b border-[#E2E8F0]">
+        <div>
+          <span className="font-mono-code text-[10px] text-[#059669] font-bold uppercase tracking-wider block">
+            RETICLE RECONNAISSANCE
+          </span>
+          <h2 className="font-editorial text-2xl font-medium text-[#0F172A] mt-0.5">
+            Discover Global Operators
+          </h2>
+        </div>
+        <span className="font-mono-code text-xs text-[#64748B]">WGS-84 DIRECTORY</span>
+      </div>
 
-      <div className="relative max-w-md mb-6">
-        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="relative max-w-md">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && search(q)}
-          placeholder="Search by name..."
-          className="editorial-input pl-10"
+          placeholder="Filter by celebrant name or ISO country [e.g. JP, CH, US]..."
+          className="observatory-input pr-10"
         />
+        <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
       </div>
 
       {busy && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="p-4 bg-white flex items-center gap-3">
-              <Skeleton className="w-10 h-10 rounded-full" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="w-24 h-4" />
-                <Skeleton className="w-16 h-3" />
+            <div key={i} className="p-4 bg-white border border-[#E2E8F0] rounded space-y-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded skeleton-shimmer" />
+                <div className="space-y-1 flex-1">
+                  <div className="h-3.5 w-28 skeleton-shimmer" />
+                  <div className="h-2.5 w-20 skeleton-shimmer" />
+                </div>
               </div>
-              <Skeleton className="w-16 h-8 rounded-full" />
-            </Card>
+            </div>
           ))}
         </div>
       )}
@@ -1365,53 +1349,38 @@ function DiscoverTab({ user, followedIds, follow, unfollow, onSelect }) {
             const following = followedIds.includes(b.id)
             return (
               <motion.div key={b.id} variants={fadeUp}>
-                <Card className="p-4 flex items-center gap-3 bg-white" hover>
-                  <button onClick={() => onSelect(b)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                    <Avatar name={b.display_name} />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-slate-900 truncate">{b.display_name}</p>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        {MONTH_ABBR[b.birth_month - 1]} {b.birth_day} · {c ? `${b.country_code} · ${c.name}` : 'Global'}
-                      </p>
-                    </div>
-                  </button>
-                  {following ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => unfollow(b.id)}
-                      title="Unsubscribe"
-                    >
-                      <UserMinus className="w-3.5 h-3.5" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => follow(b.id)}
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
+                <Card className="p-4 bg-white" hover>
+                  <div className="flex items-start justify-between">
+                    <button onClick={() => onSelect(b)} className="flex items-center gap-3 text-left flex-1 min-w-0">
+                      <Avatar name={b.display_name} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-xs text-[#0F172A] truncate">{b.display_name}</p>
+                        <p className="font-mono-code text-[10px] text-[#64748B] mt-0.5">
+                          {MONTH_ABBR[b.birth_month - 1]} {b.birth_day} · [{b.country_code || 'GL'}] {c ? c.name : ''}
+                        </p>
+                      </div>
+                    </button>
+                    {following ? (
+                      <Button variant="outline" size="sm" onClick={() => unfollow(b.id)}>
+                        UNFOLLOW
+                      </Button>
+                    ) : (
+                      <Button variant="secondary" size="sm" onClick={() => follow(b.id)}>
+                        SUBSCRIBE
+                      </Button>
+                    )}
+                  </div>
                 </Card>
               </motion.div>
             )
           })}
         </motion.div>
       )}
-
-      {!busy && results.length === 0 && (
-        <Card className="p-12 text-center bg-white">
-          <Search className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-          <p className="text-sm font-medium text-slate-600">No public profiles matched your search</p>
-          <p className="text-xs text-slate-400 mt-1">Try searching for a different name</p>
-        </Card>
-      )}
     </div>
   )
 }
 
-/* ===== Personal Tab (Clean Dual-Column Layout) ===== */
+/* ===== Personal Tab (Sovereign Circles) ===== */
 function PersonalTab({ user, personal, reload, followedIds, publicBirthdays, unfollow, onSelect }) {
   const [name, setName] = useState('')
   const [month, setMonth] = useState('')
@@ -1424,7 +1393,7 @@ function PersonalTab({ user, personal, reload, followedIds, publicBirthdays, unf
 
   async function add() {
     if (!name || !month || !day) {
-      toast.error('Name, month and day are required')
+      toast.error('Name, month, and day are required')
       return
     }
     setBusy(true)
@@ -1441,61 +1410,59 @@ function PersonalTab({ user, personal, reload, followedIds, publicBirthdays, unf
       toast.error(error.message)
       return
     }
-    setName('')
-    setMonth('')
-    setDay('')
-    setYear('')
-    setRel('')
-    toast.success('Added to your private circle')
+    setName(''); setMonth(''); setDay(''); setYear(''); setRel('')
+    toast.success('Recorded in Sovereign Circle')
     reload()
   }
 
   async function remove(id) {
     await supabase.from('personal_birthdays').delete().eq('id', id)
-    toast.success('Entry removed')
+    toast.success('Record purged')
     reload()
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Add private record form */}
+      {/* Add private record */}
       <Card className="p-6 bg-white">
-        <div className="flex items-center gap-2.5 mb-1.5">
-          <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center">
-            <Plus className="w-4 h-4 text-emerald-400" />
-          </div>
-          <h3 className="font-display font-bold text-lg text-slate-900">Add Private Birthday</h3>
+        <div className="pb-3 border-b border-[#E2E8F0] mb-4">
+          <span className="font-mono-code text-[10px] text-[#059669] font-bold uppercase tracking-wider block">
+            CONFIDENTIAL REGISTRY
+          </span>
+          <h3 className="font-editorial text-xl font-medium text-[#0F172A] mt-0.5">
+            Add to Sovereign Circle
+          </h3>
+          <p className="font-mono-code text-[11px] text-[#64748B] mt-0.5">
+            PRIVATE TO YOUR ACCOUNT ONLY • OFF-GRID CONTACTS
+          </p>
         </div>
-        <p className="text-xs text-slate-500 mb-5 ml-10">
-          Only you can see these entries. Perfect for offline contacts, family, and personal friends.
-        </p>
 
-        <div className="space-y-3.5">
+        <div className="space-y-3">
           <div>
-            <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Person Name</Label>
+            <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Celebrant Name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alex Miller"
-              className="editorial-input"
+              placeholder="e.g. Maya Chen"
+              className="observatory-input"
             />
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Month</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Month</label>
               <Select value={month} onValueChange={(v) => { setMonth(v); setDay('') }}>
-                <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Month" /></SelectTrigger>
-                <SelectContent className="bg-white border-slate-200">
+                <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Month" /></SelectTrigger>
+                <SelectContent className="bg-white border-[#CBD5E1]">
                   {MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Day</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Day</label>
               <Select value={day} onValueChange={setDay}>
-                <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Day" /></SelectTrigger>
-                <SelectContent className="bg-white border-slate-200 max-h-60">
+                <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Day" /></SelectTrigger>
+                <SelectContent className="bg-white border-[#CBD5E1] max-h-56">
                   {Array.from({ length: dayCount }, (_, i) => i + 1).map((d) => (
                     <SelectItem key={d} value={String(d)}>{d}</SelectItem>
                   ))}
@@ -1503,71 +1470,64 @@ function PersonalTab({ user, personal, reload, followedIds, publicBirthdays, unf
               </Select>
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Year</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Year</label>
               <input
                 type="number"
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
                 placeholder="Optional"
-                className="editorial-input"
+                className="observatory-input"
               />
             </div>
           </div>
 
           <div>
-            <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Relationship</Label>
+            <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Relationship Sector</label>
             <Select value={rel} onValueChange={setRel}>
-              <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Select relationship tag" /></SelectTrigger>
-              <SelectContent className="bg-white border-slate-200">
-                {['Family','Friend','Partner','Colleague','Other'].map((r) => (
+              <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Select Sector" /></SelectTrigger>
+              <SelectContent className="bg-white border-[#CBD5E1]">
+                {['Inner Council','Family','Research Fellow','Partner','Colleague','Atelier','Other'].map((r) => (
                   <SelectItem key={r} value={r}>{r}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <Button onClick={add} variant="secondary" disabled={busy} className="w-full py-3 mt-2">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save to Private Circle <Plus className="w-4 h-4" /></>}
+          <Button onClick={add} variant="secondary" disabled={busy} className="w-full py-2.5 mt-2">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'RECORD CONFIDENTIAL MILESTONE'}
           </Button>
         </div>
       </Card>
 
-      {/* Right Column: Private Records & Subscriptions */}
+      {/* Right Column: Sovereign Circles List */}
       <div className="space-y-6">
-        {/* Private Records */}
         <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-            <h3 className="font-semibold text-sm text-slate-900 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-emerald-600" />
-              Private Records ({personal.length})
-            </h3>
-            <span className="text-xs text-slate-400">Confidential</span>
+          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
+            <span className="font-mono-code text-[10px] text-[#0F172A] font-bold uppercase tracking-wider">
+              SOVEREIGN RECORDS ({personal.length})
+            </span>
+            <span className="font-mono-code text-[10px] text-[#64748B]">OFF-GRID</span>
           </div>
 
-          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+          <div className="space-y-2 max-h-56 overflow-y-auto">
             {personal.length === 0 && (
-              <div className="py-8 text-center text-slate-400">
-                <Users className="w-6 h-6 mx-auto mb-1.5 text-slate-300" />
-                <p className="text-xs">No private birthdays added yet</p>
-              </div>
+              <p className="py-6 text-center font-mono-code text-xs text-[#94A3B8]">No confidential records established.</p>
             )}
             {personal.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-colors group"
-              >
-                <Avatar name={p.person_name} size="w-9 h-9" text="text-xs" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-slate-900 truncate">{p.person_name}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {MONTH_ABBR[p.birth_month - 1]} {p.birth_day}
-                    {p.relationship ? ` · ${p.relationship}` : ''}
-                  </p>
+              <div key={p.id} className="p-2.5 bg-[#FBFBFA] border border-[#E2E8F0] rounded flex items-center justify-between hover:border-[#0F172A] transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <Avatar name={p.person_name} />
+                  <div>
+                    <p className="font-semibold text-xs text-[#0F172A]">{p.person_name}</p>
+                    <p className="font-mono-code text-[10px] text-[#64748B]">
+                      {MONTH_ABBR[p.birth_month - 1]} {p.birth_day} · {p.relationship || 'General Circle'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => remove(p.id)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                  title="Delete"
+                  className="p-1 text-[#94A3B8] hover:text-red-600 transition-colors"
+                  title="Purge record"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -1576,45 +1536,31 @@ function PersonalTab({ user, personal, reload, followedIds, publicBirthdays, unf
           </div>
         </Card>
 
-        {/* Subscriptions */}
         <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-            <h3 className="font-semibold text-sm text-slate-900 flex items-center gap-2">
-              <Bookmark className="w-4 h-4 text-emerald-600" />
-              Subscriptions ({subscribed.length})
-            </h3>
-            <span className="text-xs text-slate-400">Synced Reminders</span>
+          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
+            <span className="font-mono-code text-[10px] text-[#0F172A] font-bold uppercase tracking-wider">
+              SUBSCRIBED TELEMETRY ({subscribed.length})
+            </span>
+            <span className="font-mono-code text-[10px] text-[#059669]">SYNCED</span>
           </div>
 
-          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+          <div className="space-y-2 max-h-56 overflow-y-auto">
             {subscribed.length === 0 && (
-              <div className="py-8 text-center text-slate-400">
-                <Bookmark className="w-6 h-6 mx-auto mb-1.5 text-slate-300" />
-                <p className="text-xs">No followed profiles</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Subscribe to contacts from Discover</p>
-              </div>
+              <p className="py-6 text-center font-mono-code text-xs text-[#94A3B8]">No active global subscriptions.</p>
             )}
             {subscribed.map((b) => (
-              <div
-                key={b.id}
-                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-colors group"
-              >
-                <button onClick={() => onSelect(b)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                  <Avatar name={b.display_name} size="w-9 h-9" text="text-xs" />
+              <div key={b.id} className="p-2.5 bg-[#FBFBFA] border border-[#E2E8F0] rounded flex items-center justify-between hover:border-[#0F172A] transition-colors">
+                <button onClick={() => onSelect(b)} className="flex items-center gap-2.5 text-left flex-1 min-w-0">
+                  <Avatar name={b.display_name} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm text-slate-900 truncate">{b.display_name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="font-semibold text-xs text-[#0F172A] truncate">{b.display_name}</p>
+                    <p className="font-mono-code text-[10px] text-[#64748B]">
                       {MONTH_ABBR[b.birth_month - 1]} {b.birth_day}
                     </p>
                   </div>
                 </button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => unfollow(b.id)}
-                  title="Unfollow"
-                >
-                  <UserMinus className="w-3.5 h-3.5" />
+                <Button variant="outline" size="sm" onClick={() => unfollow(b.id)}>
+                  REMOVE
                 </Button>
               </div>
             ))}
@@ -1625,7 +1571,7 @@ function PersonalTab({ user, personal, reload, followedIds, publicBirthdays, unf
   )
 }
 
-/* ===== Profile Tab (Settings, Reminders & Privacy) ===== */
+/* ===== Profile Tab (Observatory Log & Settings) ===== */
 function ProfileTab({ user, profile, setProfile, reload }) {
   const [name, setName] = useState(profile?.display_name || '')
   const [month, setMonth] = useState(profile?.birth_month ? String(profile.birth_month) : '')
@@ -1674,7 +1620,7 @@ function ProfileTab({ user, profile, setProfile, reload }) {
       return
     }
     setProfile(data)
-    toast.success('Settings updated')
+    toast.success('Observatory log updated')
     reload()
   }
 
@@ -1691,10 +1637,10 @@ function ProfileTab({ user, profile, setProfile, reload }) {
         body: '{}',
       })
       const j = await res.json()
-      if (!res.ok) throw new Error(j.error || 'Failed to trigger test reminder')
-      toast.success(`Test reminder delivered to ${j.to}`)
+      if (!res.ok) throw new Error(j.error || 'Failed to dispatch test reminder')
+      toast.success(`Test telegram delivered to ${j.to}`)
     } catch (e) {
-      toast.error(e.message || 'Could not send test')
+      toast.error(e.message || 'Could not dispatch test')
     } finally {
       setTesting(false)
     }
@@ -1702,41 +1648,36 @@ function ProfileTab({ user, profile, setProfile, reload }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      {/* Profile Form */}
       <Card className="p-6 bg-white">
-        <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-slate-100">
+        <div className="flex items-center gap-3.5 pb-4 border-b border-[#E2E8F0] mb-5">
           <Avatar name={name || user.email} size="w-12 h-12" text="text-base" />
           <div>
-            <h2 className="font-display text-lg font-bold text-slate-900">{name || 'Your Account'}</h2>
-            <p className="text-xs text-slate-500">{user.email}</p>
+            <h2 className="font-editorial text-xl font-medium text-[#0F172A]">{name || 'Operator Profile'}</h2>
+            <p className="font-mono-code text-[11px] text-[#64748B]">{user.email}</p>
           </div>
         </div>
 
         <div className="space-y-4">
           <div>
-            <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Display Name</Label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="editorial-input"
-            />
+            <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Display Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="observatory-input" />
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Month</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Month</label>
               <Select value={month} onValueChange={(v) => { setMonth(v); setDay('') }}>
-                <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Month" /></SelectTrigger>
-                <SelectContent className="bg-white border-slate-200">
+                <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Month" /></SelectTrigger>
+                <SelectContent className="bg-white border-[#CBD5E1]">
                   {MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Day</Label>
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Day</label>
               <Select value={day} onValueChange={setDay}>
-                <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Day" /></SelectTrigger>
-                <SelectContent className="bg-white border-slate-200 max-h-60">
+                <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Day" /></SelectTrigger>
+                <SelectContent className="bg-white border-[#CBD5E1] max-h-56">
                   {Array.from({ length: dayCount }, (_, i) => i + 1).map((d) => (
                     <SelectItem key={d} value={String(d)}>{d}</SelectItem>
                   ))}
@@ -1744,25 +1685,19 @@ function ProfileTab({ user, profile, setProfile, reload }) {
               </Select>
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Year</Label>
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                placeholder="Optional"
-                className="editorial-input"
-              />
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Year</label>
+              <input type="number" value={year} onChange={(e) => setYear(e.target.value)} placeholder="Optional" className="observatory-input" />
             </div>
           </div>
 
           <div>
-            <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 block">Location</Label>
+            <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Location Coordinates</label>
             <Select value={country} onValueChange={setCountry}>
-              <SelectTrigger className="editorial-input h-auto"><SelectValue placeholder="Select location" /></SelectTrigger>
-              <SelectContent className="bg-white border-slate-200 max-h-60">
+              <SelectTrigger className="observatory-input h-auto"><SelectValue placeholder="Select Location" /></SelectTrigger>
+              <SelectContent className="bg-white border-[#CBD5E1] max-h-56">
                 {COUNTRIES.map((c) => (
                   <SelectItem key={c.code} value={c.code}>
-                    <span className="font-mono text-xs text-slate-400 mr-2">[{c.code}]</span> {c.name}
+                    <span className="font-mono-code text-[10px] text-[#64748B] mr-2">[{c.code}]</span> {c.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1771,86 +1706,61 @@ function ProfileTab({ user, profile, setProfile, reload }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <Twitter className="w-3 h-3 text-slate-400" /> X Handle
-              </Label>
-              <input
-                value={x}
-                onChange={(e) => setX(e.target.value)}
-                placeholder="@handle"
-                className="editorial-input"
-              />
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">X Handle</label>
+              <input value={x} onChange={(e) => setX(e.target.value)} placeholder="@handle" className="observatory-input" />
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <Instagram className="w-3 h-3 text-slate-400" /> Instagram
-              </Label>
-              <input
-                value={ig}
-                onChange={(e) => setIg(e.target.value)}
-                placeholder="@handle"
-                className="editorial-input"
-              />
+              <label className="font-mono-code text-[10px] font-semibold text-[#475569] uppercase block mb-1">Instagram</label>
+              <input value={ig} onChange={(e) => setIg(e.target.value)} placeholder="@handle" className="observatory-input" />
             </div>
           </div>
 
-          <Button
-            onClick={save}
-            variant="secondary"
-            disabled={busy}
-            className="w-full py-3 mt-2"
-          >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save Changes <Check className="w-4 h-4" /></>}
+          <Button onClick={save} variant="primary" disabled={busy} className="w-full py-2.5 mt-2">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SAVE OBSERVATORY SETTINGS'}
           </Button>
         </div>
       </Card>
 
-      {/* Right Column: Privacy & Reminder Settings */}
       <div className="space-y-6">
-        {/* Privacy */}
         <Card className="p-6 bg-white space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <h3 className="font-semibold text-sm text-slate-900">Privacy & Visibility</h3>
+          <div className="pb-3 border-b border-[#E2E8F0]">
+            <span className="font-mono-code text-[10px] text-[#0F172A] font-bold uppercase tracking-wider block">
+              PRIVACY CRYPT
+            </span>
           </div>
-          <ToggleRow
-            title="Public Birthday Profile"
-            desc="Visible on the 3D globe and searchable by friends"
-            checked={isPublic}
-            onChange={setIsPublic}
-          />
-          <ToggleRow
-            title="Display Birth Year"
-            desc="Shows your full age rather than just calendar day"
-            checked={yearPublic}
-            onChange={setYearPublic}
-            disabled={!year}
-          />
+          <div className="p-3 bg-[#F4F4F1] border border-[#E2E8F0] rounded flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-xs text-[#0F172A]">Public Cartographic Beacon</p>
+              <p className="font-mono-code text-[10px] text-[#64748B]">Visible on 3D globe to all observers</p>
+            </div>
+            <Switch checked={isPublic} onCheckedChange={setIsPublic} className="data-[state=checked]:bg-[#059669]" />
+          </div>
+          <div className="p-3 bg-[#F4F4F1] border border-[#E2E8F0] rounded flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-xs text-[#0F172A]">Display Birth Year</p>
+              <p className="font-mono-code text-[10px] text-[#64748B]">Reveal solar cycle number</p>
+            </div>
+            <Switch checked={yearPublic} onCheckedChange={setYearPublic} disabled={!year} className="data-[state=checked]:bg-[#059669]" />
+          </div>
         </Card>
 
-        {/* Reminders */}
         <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-emerald-600" />
-              <h3 className="font-semibold text-sm text-slate-900">Email Reminders</h3>
-            </div>
-            <Switch
-              checked={reminders}
-              onCheckedChange={setReminders}
-              className="data-[state=checked]:bg-emerald-600"
-            />
+          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+            <span className="font-mono-code text-[10px] text-[#0F172A] font-bold uppercase tracking-wider">
+              PRECISION EMAIL TELEMETRY
+            </span>
+            <Switch checked={reminders} onCheckedChange={setReminders} className="data-[state=checked]:bg-[#059669]" />
           </div>
 
-          <p className="text-xs text-slate-500 mt-3 mb-4">
-            Select schedule milestones to receive notification emails before upcoming birthdays:
+          <p className="font-mono-code text-[11px] text-[#64748B] mt-3 mb-4">
+            RECEIVE DISPATCH BEFORE EACH SOLAR RETURN:
           </p>
 
           <div className="flex flex-wrap gap-2">
             {[
-              { o: 3, l: '3 days prior' },
-              { o: 1, l: '1 day prior' },
-              { o: 0, l: 'Morning of' },
+              { o: 3, l: '3 DAYS PRIOR' },
+              { o: 1, l: '1 DAY PRIOR' },
+              { o: 0, l: 'MORNING OF' },
             ].map(({ o, l }) => {
               const on = offsets.includes(o)
               return (
@@ -1859,31 +1769,23 @@ function ProfileTab({ user, profile, setProfile, reload }) {
                   type="button"
                   disabled={!reminders}
                   onClick={() => toggleOffset(o)}
-                  className={`btn-grain px-3.5 py-2 text-xs font-semibold rounded-full transition-all duration-150 disabled:opacity-40 ${
-                    on
-                      ? 'btn-grain-secondary'
-                      : 'btn-grain-outline'
+                  className={`btn-grain px-3 py-1.5 text-[10px] rounded transition-all disabled:opacity-40 ${
+                    on ? 'btn-grain-secondary' : 'btn-grain-outline'
                   }`}
                 >
-                  {on && <Check className="w-3.5 h-3.5 mr-1" />}
+                  {on && <Check className="w-3 h-3 mr-1" />}
                   {l}
                 </button>
               )
             })}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <Button
-              onClick={testReminder}
-              variant="outline"
-              size="sm"
-              disabled={testing}
-              className="w-full py-2.5"
-            >
-              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Send Test Reminder Email</>}
+          <div className="mt-5 pt-3 border-t border-[#E2E8F0]">
+            <Button onClick={testReminder} variant="outline" size="sm" disabled={testing} className="w-full">
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'DISPATCH TEST TELEGRAM'}
             </Button>
-            <p className="text-[11px] text-slate-400 text-center mt-2">
-              Sends an immediate preview email for your nearest birthday contact.
+            <p className="font-mono-code text-[10px] text-[#94A3B8] text-center mt-2">
+              Dispatches an immediate sample notification for nearest contact.
             </p>
           </div>
         </Card>
@@ -1892,24 +1794,7 @@ function ProfileTab({ user, profile, setProfile, reload }) {
   )
 }
 
-function ToggleRow({ title, desc, checked, onChange, disabled }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl bg-slate-50/80 border border-slate-200/80 px-4 py-3">
-      <div className="pr-4">
-        <p className="font-medium text-xs text-slate-900">{title}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5">{desc}</p>
-      </div>
-      <Switch
-        checked={checked}
-        onCheckedChange={onChange}
-        disabled={disabled}
-        className="data-[state=checked]:bg-emerald-600"
-      />
-    </div>
-  )
-}
-
-/* ===== Person Details Dialog (Clean Editorial Modal) ===== */
+/* ===== Person Dossier Modal ===== */
 function PersonDialog({ person, onClose, followedIds, follow, unfollow, meId }) {
   if (!person) return null
   const c = COUNTRY_MAP[person.country_code]
@@ -1919,31 +1804,35 @@ function PersonDialog({ person, onClose, followedIds, follow, unfollow, meId }) 
 
   return (
     <Dialog open={!!person} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="rounded-2xl bg-white border border-slate-200 shadow-2xl p-0 overflow-hidden max-w-sm">
-        <div className="p-6 bg-slate-900 text-white relative">
+      <DialogContent className="rounded-lg bg-white border border-[#CBD5E1] shadow-2xl p-0 overflow-hidden max-w-sm font-sans-body">
+        <div className="p-5 bg-[#0F172A] text-white">
           <DialogHeader>
-            <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl font-bold text-emerald-400 shadow-inner">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded bg-[#1E293B] border border-[#334155] flex items-center justify-center font-mono-code text-lg font-bold text-[#10B981]">
                 {(person.display_name || '?')[0]?.toUpperCase()}
               </div>
               <div className="text-left min-w-0">
-                <DialogTitle className="text-lg font-bold font-display text-white truncate">
+                <DialogTitle className="font-editorial text-lg font-medium text-white truncate">
                   {person.display_name}
                 </DialogTitle>
-                <DialogDescription className="text-slate-400 text-xs mt-0.5 flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-slate-400" />
-                  {c ? `${person.country_code} · ${c.name}` : 'Global Atlas'}
+                <DialogDescription className="font-mono-code text-[#94A3B8] text-[10px] mt-0.5 uppercase flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-[#10B981]" />
+                  [{person.country_code || 'GL'}] {c ? c.name : 'Global Atlas'}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-semibold text-emerald-800">
-            <CalendarDays className="w-3.5 h-3.5 text-emerald-600" />
-            {MONTHS[person.birth_month - 1]} {ordinal(person.birth_day)}
-            {age ? ` · Turning ${age + 1}` : ''}
+        <div className="p-5 space-y-4">
+          <div className="p-3 bg-[#ECFDF5] border border-[#A7F3D0] rounded">
+            <span className="font-mono-code text-[10px] text-[#065F46] font-bold uppercase block">
+              SOLAR CYCLE MILESTONE
+            </span>
+            <p className="font-editorial text-base text-[#065F46] font-medium mt-0.5">
+              {MONTHS[person.birth_month - 1]} {ordinal(person.birth_day)}
+              {age ? ` • Turning ${age + 1}` : ''}
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -1952,9 +1841,9 @@ function PersonDialog({ person, onClose, followedIds, follow, unfollow, meId }) 
                 href={`https://x.com/${person.x_handle.replace('@', '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+                className="font-mono-code text-[10px] inline-flex items-center gap-1 bg-[#F4F4F1] border border-[#CBD5E1] px-2.5 py-1 rounded text-[#0F172A] hover:bg-[#E2E8F0]"
               >
-                <Twitter className="w-3.5 h-3.5 text-slate-500" /> {person.x_handle}
+                <Twitter className="w-3 h-3 text-slate-500" /> {person.x_handle}
                 <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
               </a>
             )}
@@ -1963,35 +1852,23 @@ function PersonDialog({ person, onClose, followedIds, follow, unfollow, meId }) 
                 href={`https://instagram.com/${person.instagram_handle.replace('@', '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+                className="font-mono-code text-[10px] inline-flex items-center gap-1 bg-[#F4F4F1] border border-[#CBD5E1] px-2.5 py-1 rounded text-[#0F172A] hover:bg-[#E2E8F0]"
               >
-                <Instagram className="w-3.5 h-3.5 text-slate-500" /> {person.instagram_handle}
+                <Instagram className="w-3 h-3 text-slate-500" /> {person.instagram_handle}
                 <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
               </a>
             )}
           </div>
 
-          {!person.x_handle && !person.instagram_handle && (
-            <p className="text-xs text-slate-400">No social profiles attached.</p>
-          )}
-
           {!isMe && (
             <div className="pt-2">
               {following ? (
-                <Button
-                  variant="outline"
-                  onClick={() => { unfollow(person.id); onClose() }}
-                  className="w-full py-2.5 text-xs"
-                >
-                  <UserMinus className="w-3.5 h-3.5 mr-1" /> Unsubscribe from reminders
+                <Button variant="outline" size="sm" onClick={() => { unfollow(person.id); onClose() }} className="w-full">
+                  UNSUBSCRIBE TELEMETRY
                 </Button>
               ) : (
-                <Button
-                  variant="secondary"
-                  onClick={() => { follow(person.id); onClose() }}
-                  className="w-full py-2.5 text-xs"
-                >
-                  <Bookmark className="w-3.5 h-3.5 mr-1" /> Subscribe to birthday
+                <Button variant="secondary" size="sm" onClick={() => { follow(person.id); onClose() }} className="w-full">
+                  SUBSCRIBE TO SOLAR RETURN
                 </Button>
               )}
             </div>
@@ -2017,11 +1894,10 @@ function buildGlobePoints(publicBirthdays, tM, tD) {
     pts.push({
       lat: c.lat + jLat,
       lng: c.lng + jLng,
-      // Emerald green for today and upcoming celebrations
-      color: isToday ? '#10B981' : soon ? '#34D399' : '#0284C7',
-      r: isToday ? 0.9 : soon ? 0.55 : 0.3,
-      alt: isToday ? 0.12 : soon ? 0.05 : 0.015,
-      label: `${b.display_name} · ${c.name}${isToday ? ' (Celebrating Today)' : soon ? ` (in ${dU} days)` : ''}`,
+      color: isToday ? '#059669' : soon ? '#10B981' : '#64748B',
+      r: isToday ? 0.95 : soon ? 0.6 : 0.32,
+      alt: isToday ? 0.14 : soon ? 0.06 : 0.015,
+      label: `[${b.country_code}] ${b.display_name} • ${c.name}${isToday ? ' (ACTIVE TRANSIT TODAY)' : soon ? ` (IN ${dU}D)` : ''}`,
       data: b,
     })
   }
