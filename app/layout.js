@@ -1,4 +1,8 @@
 import './globals.css'
+import { DM_Sans, Fraunces } from 'next/font/google'
+const sans = DM_Sans({ subsets: ['latin'], variable: '--font-body', display: 'swap' })
+const serif = Fraunces({ subsets: ['latin'], variable: '--font-heading', display: 'swap' })
+export const viewport = { themeColor: '#f5f0e5', width: 'device-width', initialScale: 1 }
 import { Providers } from './providers'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -9,16 +13,13 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`bg-background ${sans.variable} ${serif.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         <script dangerouslySetInnerHTML={{__html:'window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);'}} />
       </head>
-      <body>
+      <body className="font-sans">
         <Providers>{children}</Providers>
-        <Toaster position="top-center" richColors toastOptions={{ style: { borderRadius: '16px', background: 'rgba(12,12,24,0.9)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' } }} />
+        <Toaster theme="light" position="top-center" toastOptions={{ style: { borderRadius: '4px', background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))', fontFamily: 'var(--font-body)' } }} />
       </body>
     </html>
   )
