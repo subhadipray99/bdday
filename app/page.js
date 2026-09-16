@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase, supabaseConfigurationError } from '@/lib/supabaseClient'
 import { COUNTRIES, COUNTRY_MAP, flagEmoji } from '@/lib/countries'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -174,6 +174,8 @@ export default function App() {
   }, [loadPublic, loadFollows, loadPersonal, loadNotifications])
 
   useEffect(() => {
+    if (!supabase) return
+
     let mounted = true
     ;(async () => {
       await loadPublic()
@@ -195,6 +197,17 @@ export default function App() {
     })
     return () => { mounted = false; sub?.subscription?.unsubscribe() }
   }, [loadPublic, loadProfile, refreshUserData])
+
+  if (supabaseConfigurationError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-6">
+        <section role="alert" className="max-w-lg rounded-3xl glass-card p-8">
+          <h1 className="font-display text-2xl font-bold">Connection setup required</h1>
+          <p className="mt-4 text-base leading-relaxed">{supabaseConfigurationError}</p>
+        </section>
+      </main>
+    )
+  }
 
   if (loading) {
     return (
