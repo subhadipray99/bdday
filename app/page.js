@@ -1001,6 +1001,56 @@ function GlobeTab({ publicBirthdays, tM, tD, onSelect }) {
   )
 }
 
+/* ===== Helper to build combined entries for Upcoming and Calendar ===== */
+function buildEntries(mode, publicBirthdays, followedIds, personal, profile) {
+  if (mode === 'global') {
+    return (publicBirthdays || []).map((b) => ({
+      ...b,
+      name: b.display_name,
+      source: 'public',
+    }))
+  }
+
+  const list = []
+  if (profile?.birth_month && profile?.birth_day) {
+    list.push({
+      ...profile,
+      id: profile.id || 'me',
+      name: `${profile.display_name || 'You'} (You)`,
+      birth_month: profile.birth_month,
+      birth_day: profile.birth_day,
+      birth_year: profile.birth_year,
+      country_code: profile.country_code,
+      source: 'self',
+    })
+  }
+
+  ;(personal || []).forEach((p) => {
+    list.push({
+      ...p,
+      id: p.id,
+      name: p.person_name,
+      birth_month: p.birth_month,
+      birth_day: p.birth_day,
+      birth_year: p.birth_year,
+      relationship: p.relationship,
+      source: 'personal',
+    })
+  })
+
+  ;(publicBirthdays || [])
+    .filter((b) => (followedIds || []).includes(b.id))
+    .forEach((b) => {
+      list.push({
+        ...b,
+        name: b.display_name,
+        source: 'subscribed',
+      })
+    })
+
+  return list
+}
+
 /* ===== Upcoming Tab (Clean, Normal English) ===== */
 function UpcomingTab({ mode, publicBirthdays, followedIds, personal, profile, onSelect }) {
   const entries = useMemo(
